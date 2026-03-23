@@ -1054,6 +1054,43 @@ bot.on('physicsTick', () => {
     }
   }
   
+  // 跟随逻辑
+  if (followTarget && followTarget.entity) {
+    const mcData = require('minecraft-data')(bot.version)
+    bot.pathfinder.setMovements(new Movements(bot, mcData))
+    
+    // 使用配置中的跟随距离
+    const distance = bot.entity.position.distanceTo(followTarget.entity.position)
+    if (distance > config.followDistance) {
+      bot.pathfinder.setGoal(new GoalBlock(
+        Math.floor(followTarget.entity.position.x),
+        Math.floor(followTarget.entity.position.y),
+        Math.floor(followTarget.entity.position.z)
+      ))
+    } else if (distance < config.followDistance - 1) {
+      // 如果太近，就稍微后退
+      const direction = bot.entity.position.subtract(followTarget.entity.position).normalize()
+      bot.pathfinder.setGoal(new GoalBlock(
+        Math.floor(bot.entity.position.x + direction.x * 2),
+        Math.floor(bot.entity.position.y),
+        Math.floor(bot.entity.position.z + direction.z * 2)
+      ))
+    }
+  }
+  
+  // 守卫逻辑
+  if (guardPos) {
+    const filter = e => e.type === 'hostile' && e.position.distanceTo(bot.entity.position) < config.guardRange &&
+                        e.displayName !== 'Armor Stand' // Mojang classifies armor stands as mobs for some reason?
+
+    const entity = bot.nearestEntity(filter)
+    const now = Date.now()
+    if (entity && now - lastAttackTime > MIN_ATTACK_DELAY) {
+      bot.pvp.attack(entity)
+      lastAttackTime = now
+    }
+  }
+  
   if (bot.pvp.target) return
   
   // 自主行走功能
@@ -1112,47 +1149,6 @@ bot.on('physicsTick', () => {
         randomZ
       ))
     }
-  }
-})
-
-bot.on('physicsTick', () => {
-  // 第二个physicsTick事件不需要单独计数，使用上面的计数器
-  if (tickCounter % TICK_INTERVAL !== 0) return
-  
-  // 跟随逻辑
-  if (followTarget && followTarget.entity) {
-    const mcData = require('minecraft-data')(bot.version)
-    bot.pathfinder.setMovements(new Movements(bot, mcData))
-    
-    // 使用配置中的跟随距离
-    const distance = bot.entity.position.distanceTo(followTarget.entity.position)
-    if (distance > config.followDistance) {
-      bot.pathfinder.setGoal(new GoalBlock(
-        Math.floor(followTarget.entity.position.x),
-        Math.floor(followTarget.entity.position.y),
-        Math.floor(followTarget.entity.position.z)
-      ))
-    } else if (distance < config.followDistance - 1) {
-      // 如果太近，就稍微后退
-      const direction = bot.entity.position.subtract(followTarget.entity.position).normalize()
-      bot.pathfinder.setGoal(new GoalBlock(
-        Math.floor(bot.entity.position.x + direction.x * 2),
-        Math.floor(bot.entity.position.y),
-        Math.floor(bot.entity.position.z + direction.z * 2)
-      ))
-    }
-  }
-  
-  if (!guardPos) return
-
-  const filter = e => e.type === 'hostile' && e.position.distanceTo(bot.entity.position) < config.guardRange &&
-                      e.displayName !== 'Armor Stand' // Mojang classifies armor stands as mobs for some reason?
-
-  const entity = bot.nearestEntity(filter)
-  const now = Date.now()
-  if (entity && now - lastAttackTime > MIN_ATTACK_DELAY) {
-    bot.pvp.attack(entity)
-    lastAttackTime = now
   }
 })
 
