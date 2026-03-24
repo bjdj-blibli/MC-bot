@@ -30,6 +30,10 @@ class SimpleBotLauncher:
         self.bot_process = None
         self.is_running = False
         
+        # 动画相关
+        self.animation_speed = 20  # 动画速度（毫秒）
+        self.animation_running = False  # 动画运行状态
+        
         # 加载配置
         self.load_config()
         
@@ -50,6 +54,36 @@ class SimpleBotLauncher:
             font=("Microsoft YaHei", 10, "bold")
         )
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # 启动窗口淡入动画
+        self.fade_in_window()
+        
+    def fade_in_window(self):
+        """窗口淡入动画"""
+        try:
+            # 初始透明度
+            alpha = 0.0
+            self.root.attributes('-alpha', alpha)
+            
+            def animate():
+                nonlocal alpha
+                alpha += 0.05
+                if alpha <= 1.0:
+                    try:
+                        self.root.attributes('-alpha', alpha)
+                        self.root.after(20, animate)
+                    except tk.TclError:
+                        pass
+                else:
+                    try:
+                        self.root.attributes('-alpha', 1.0)
+                    except tk.TclError:
+                        pass
+            
+            animate()
+        except tk.TclError:
+            # 如果透明度不支持，跳过动画
+            pass
     
     def setup_styles(self):
         """设置现代样式"""
@@ -86,7 +120,15 @@ class SimpleBotLauncher:
         style.map(
             "Accent.TButton",
             background=[("active", self.secondary_color)],
-            foreground=[("active", self.white)]
+            foreground=[("active", self.white)],
+            relief=[("active", "raised")]
+        )
+        
+        # 配置普通按钮悬停效果
+        style.map(
+            "TButton",
+            background=[("active", "#e0e0e0")],
+            relief=[("active", "raised")]
         )
         
         # 配置标签框架样式
@@ -111,6 +153,13 @@ class SimpleBotLauncher:
             padding=(8, 4),
             relief=tk.FLAT,
             borderwidth=2
+        )
+        
+        # 配置输入框聚焦效果
+        style.map(
+            "TEntry",
+            bordercolor=[("focus", self.primary_color)],
+            relief=[("focus", "sunken")]
         )
         
         # 配置标签页样式
@@ -181,20 +230,221 @@ class SimpleBotLauncher:
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # 创建标签页
-        notebook = ttk.Notebook(main_frame)
-        notebook.pack(fill=tk.BOTH, expand=True, pady=10)
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # 添加标签页切换事件
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
         
         # 启动页面
-        self.create_launch_tab(notebook)
+        self.create_launch_tab(self.notebook)
         
         # 控制页面
-        self.create_control_tab(notebook)
+        self.create_control_tab(self.notebook)
         
         # 配置页面
-        self.create_config_tab(notebook)
+        self.create_config_tab(self.notebook)
         
         # 记忆页面
-        self.create_memory_tab(notebook)
+        self.create_memory_tab(self.notebook)
+        
+        # 依赖下载教程页面
+        self.create_dependency_tab(self.notebook)
+    
+    def on_tab_changed(self, event):
+        """标签页切换动画"""
+        try:
+            # 获取当前选中的标签页
+            current_tab = self.notebook.select()
+            tab_frame = self.notebook.nametowidget(current_tab)
+            
+            # 启动淡入动画
+            self.fade_in_tab(tab_frame)
+        except Exception:
+            # 如果动画失败，跳过
+            pass
+    
+    def fade_in_tab(self, frame):
+        """标签页淡入动画"""
+        try:
+            # 递归获取所有子控件
+            def get_all_widgets(widget):
+                widgets = [widget]
+                for child in widget.winfo_children():
+                    widgets.extend(get_all_widgets(child))
+                return widgets
+            
+            all_widgets = get_all_widgets(frame)
+            
+            # 淡入动画
+            alpha = 0.0
+            
+            def animate():
+                nonlocal alpha
+                alpha += 0.05
+                if alpha <= 1.0:
+                    for widget in all_widgets:
+                        try:
+                            widget.attributes('-alpha', alpha)
+                        except tk.TclError:
+                            pass
+                    try:
+                        self.root.after(20, animate)
+                    except tk.TclError:
+                        pass
+                else:
+                    for widget in all_widgets:
+                        try:
+                            widget.attributes('-alpha', 1.0)
+                        except tk.TclError:
+                            pass
+            
+            animate()
+        except Exception:
+            # 如果动画失败，跳过
+            pass
+    
+    def animate_button(self, button):
+        """按钮点击动画"""
+        try:
+            if self.animation_running:
+                return
+            
+            self.animation_running = True
+            
+            # 按钮按下效果
+            original_relief = button.cget('relief')
+            button.config(relief=tk.SUNKEN)
+            
+            def restore_button():
+                try:
+                    button.config(relief=original_relief)
+                except Exception:
+                    pass
+                finally:
+                    self.animation_running = False
+            
+            # 恢复按钮状态
+            try:
+                self.root.after(100, restore_button)
+            except Exception:
+                restore_button()
+        except Exception:
+            # 如果动画失败，确保重置状态
+            self.animation_running = False
+    
+    def animate_status_change(self, new_status):
+        """状态变化动画"""
+        try:
+            # 状态标签闪烁效果
+            original_bg = self.status_label.cget('bg')
+            
+            def flash():
+                try:
+                    current_bg = self.status_label.cget('bg')
+                    new_bg = self.primary_color if current_bg == original_bg else original_bg
+                    self.status_label.config(bg=new_bg)
+                    
+                    # 继续闪烁
+                    if self.status_label.cget('bg') != original_bg:
+                        try:
+                            self.root.after(100, flash)
+                        except Exception:
+                            pass
+                    else:
+                        # 闪烁结束后更新状态
+                        self.status_var.set(new_status)
+                except Exception:
+                    # 如果闪烁失败，直接更新状态
+                    self.status_var.set(new_status)
+            
+            # 开始闪烁
+            try:
+                self.root.after(100, flash)
+            except Exception:
+                # 如果动画失败，直接更新状态
+                self.status_var.set(new_status)
+        except Exception:
+            # 如果动画失败，直接更新状态
+            self.status_var.set(new_status)
+    
+    def animate_success_message(self, message):
+        """成功消息动画"""
+        try:
+            # 创建临时消息标签
+            message_label = tk.Label(
+                self.root,
+                text=message,
+                bg=self.secondary_color,
+                fg=self.white,
+                font=("Microsoft YaHei", 12, "bold"),
+                padding=(20, 10),
+                relief=tk.RAISED,
+                borderwidth=2
+            )
+            
+            # 计算位置（屏幕中央）
+            try:
+                x = self.root.winfo_width() // 2 - 100
+                y = self.root.winfo_height() // 2 - 30
+            except Exception:
+                x = 350
+                y = 295
+            
+            message_label.place(x=x, y=y, width=200, height=60)
+            
+            # 初始透明度
+            try:
+                message_label.attributes('-alpha', 0.0)
+            except tk.TclError:
+                pass
+            
+            # 淡入动画
+            alpha = 0.0
+            
+            def fade_in():
+                nonlocal alpha
+                alpha += 0.05
+                if alpha <= 1.0:
+                    try:
+                        message_label.attributes('-alpha', alpha)
+                    except tk.TclError:
+                        pass
+                    try:
+                        self.root.after(20, fade_in)
+                    except Exception:
+                        pass
+                else:
+                    # 显示一段时间后淡出
+                    try:
+                        self.root.after(2000, fade_out)
+                    except Exception:
+                        fade_out()
+            
+            def fade_out():
+                nonlocal alpha
+                alpha -= 0.05
+                if alpha >= 0.0:
+                    try:
+                        message_label.attributes('-alpha', alpha)
+                    except tk.TclError:
+                        pass
+                    try:
+                        self.root.after(20, fade_out)
+                    except Exception:
+                        pass
+                else:
+                    # 移除标签
+                    try:
+                        message_label.destroy()
+                    except Exception:
+                        pass
+            
+            # 开始动画
+            fade_in()
+        except Exception:
+            # 如果动画失败，使用简单的消息框
+            messagebox.showinfo("成功", message)
     
     def create_launch_tab(self, notebook):
         """创建启动标签页"""
@@ -321,14 +571,14 @@ class SimpleBotLauncher:
             self.config_entries[key] = entry
         
         # 保存按钮
-        save_btn = ttk.Button(
+        self.config_save_btn = ttk.Button(
             scrollable_frame, 
             text="保存所有配置", 
             command=self.save_all_config,
             style="Accent.TButton"
         )
-        save_btn.pack(pady=30)
-        save_btn.pack_configure(ipadx=20, ipady=5)
+        self.config_save_btn.pack(pady=30)
+        self.config_save_btn.pack_configure(ipadx=20, ipady=5)
     
     def create_control_tab(self, notebook):
         """创建机器人指令大全标签页"""
@@ -472,6 +722,155 @@ class SimpleBotLauncher:
                 )
                 desc_label.grid(row=i, column=1, padx=10, pady=5, sticky="w")
     
+    def create_dependency_tab(self, notebook):
+        """创建依赖下载教程标签页"""
+        tab = ttk.Frame(notebook)
+        tab.configure(style="TFrame")
+        notebook.add(tab, text="依赖下载教程")
+        
+        # 标题
+        title_label = tk.Label(
+            tab, 
+            text="依赖下载教程", 
+            font=("Microsoft YaHei", 18, "bold"), 
+            bg=self.bg_color, 
+            fg=self.primary_color
+        )
+        title_label.pack(pady=20)
+        
+        # 添加滚动区域
+        canvas = tk.Canvas(tab, bg=self.bg_color)
+        scrollbar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
+        
+        # 教程框架
+        tutorial_frame = ttk.LabelFrame(canvas, text="安装步骤", padding="20")
+        tutorial_frame.configure(style="TLabelframe")
+        
+        # 配置滚动
+        tutorial_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=tutorial_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=30, pady=15)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 步骤1: 安装Node.js
+        step1_frame = ttk.LabelFrame(tutorial_frame, text="步骤1: 安装Node.js", padding="15")
+        step1_frame.pack(fill=tk.X, pady=15)
+        
+        step1_content = """
+1. 访问 Node.js 官方网站: https://nodejs.org
+2. 下载适合你操作系统的 LTS 版本（长期支持版）
+3. 运行安装程序并按照提示完成安装
+4. 安装完成后，打开命令提示符（Windows）或终端（Mac/Linux）
+5. 运行以下命令验证安装是否成功:
+   - node -v
+   - npm -v
+
+如果命令返回版本号，则表示安装成功。
+        """
+        step1_label = tk.Label(
+            step1_frame, 
+            text=step1_content,
+            font=("Microsoft YaHei", 10),
+            fg=self.text_color,
+            bg=self.bg_color,
+            wraplength=600,
+            justify=tk.LEFT
+        )
+        step1_label.pack(fill=tk.X, pady=10)
+        
+        # 步骤2: 安装依赖包
+        step2_frame = ttk.LabelFrame(tutorial_frame, text="步骤2: 安装依赖包", padding="15")
+        step2_frame.pack(fill=tk.X, pady=15)
+        
+        step2_content = """
+1. 打开命令提示符（Windows）或终端（Mac/Linux）
+2. 导航到机器人启动器所在的文件夹（包含 index.js 文件的目录）
+3. 运行以下命令安装依赖包:
+   - npm install
+
+这个命令会自动安装 package.json 文件中列出的所有依赖包，包括:
+- mineflayer: Minecraft 机器人核心库
+- mineflayer-pathfinder: 路径查找功能
+- mineflayer-pvp: PVP 战斗功能
+- @discordjs/voice: Discord 语音功能
+- gpt4all: AI 对话功能
+        """
+        step2_label = tk.Label(
+            step2_frame, 
+            text=step2_content,
+            font=("Microsoft YaHei", 10),
+            fg=self.text_color,
+            bg=self.bg_color,
+            wraplength=600,
+            justify=tk.LEFT
+        )
+        step2_label.pack(fill=tk.X, pady=10)
+        
+        # 步骤3: 验证安装
+        step3_frame = ttk.LabelFrame(tutorial_frame, text="步骤3: 验证安装", padding="15")
+        step3_frame.pack(fill=tk.X, pady=15)
+        
+        step3_content = """
+1. 安装完成后，运行机器人启动器
+2. 点击 "启动机器人" 按钮
+3. 如果一切正常，你应该看到机器人成功连接到服务器的消息
+4. 如果出现错误，请检查以下几点:
+   - Node.js 是否正确安装
+   - 依赖包是否全部安装成功
+   - 网络连接是否正常
+   - 服务器地址和端口是否正确
+        """
+        step3_label = tk.Label(
+            step3_frame, 
+            text=step3_content,
+            font=("Microsoft YaHei", 10),
+            fg=self.text_color,
+            bg=self.bg_color,
+            wraplength=600,
+            justify=tk.LEFT
+        )
+        step3_label.pack(fill=tk.X, pady=10)
+        
+        # 常见问题
+        faq_frame = ttk.LabelFrame(tutorial_frame, text="常见问题", padding="15")
+        faq_frame.pack(fill=tk.X, pady=15)
+        
+        faq_content = """
+1. **npm install 命令失败**
+   - 检查网络连接
+   - 尝试使用管理员权限运行命令提示符
+   - 尝试清理 npm 缓存: npm cache clean --force
+
+2. **机器人无法连接到服务器**
+   - 检查服务器地址和端口是否正确
+   - 检查服务器是否在线
+   - 检查防火墙是否阻止了连接
+
+3. **缺少依赖包错误**
+   - 重新运行 npm install 命令
+   - 检查 package.json 文件是否完整
+
+4. **Node.js 版本问题**
+   - 确保安装的是 LTS 版本
+   - 版本不应低于 14.0.0
+        """
+        faq_label = tk.Label(
+            faq_frame, 
+            text=faq_content,
+            font=("Microsoft YaHei", 10),
+            fg=self.text_color,
+            bg=self.bg_color,
+            wraplength=600,
+            justify=tk.LEFT
+        )
+        faq_label.pack(fill=tk.X, pady=10)
+    
     def create_memory_tab(self, notebook):
         """创建记忆标签页"""
         tab = ttk.Frame(notebook)
@@ -500,11 +899,11 @@ class SimpleBotLauncher:
         self.search_entry = ttk.Entry(search_frame)
         self.search_entry.pack(side=tk.LEFT, padx=10, fill=tk.X, expand=True)
         
-        search_btn = ttk.Button(search_frame, text="搜索", command=self.search_memory, style="Accent.TButton")
-        search_btn.pack(side=tk.LEFT, padx=10)
+        self.search_btn = ttk.Button(search_frame, text="搜索", command=self.search_memory, style="Accent.TButton")
+        self.search_btn.pack(side=tk.LEFT, padx=10)
         
-        refresh_btn = ttk.Button(search_frame, text="刷新", command=self.load_memory, style="TButton")
-        refresh_btn.pack(side=tk.LEFT, padx=10)
+        self.refresh_btn = ttk.Button(search_frame, text="刷新", command=self.load_memory, style="TButton")
+        self.refresh_btn.pack(side=tk.LEFT, padx=10)
         
         # 记忆显示
         self.memory_text = scrolledtext.ScrolledText(
@@ -527,6 +926,9 @@ class SimpleBotLauncher:
             messagebox.showinfo("提示", "机器人已经在运行中")
             return
         
+        # 添加按钮点击动画
+        self.animate_button(self.start_btn)
+        
         try:
             # 更新配置
             self.save_settings()
@@ -544,7 +946,8 @@ class SimpleBotLauncher:
             self.is_running = True
             self.start_btn.config(state=tk.DISABLED)
             self.stop_btn.config(state=tk.NORMAL)
-            self.status_var.set("机器人运行中...")
+            # 添加状态变化动画
+            self.animate_status_change("机器人运行中...")
             
             # 读取输出
             self.output_thread = threading.Thread(target=self.read_output, daemon=True)
@@ -559,6 +962,9 @@ class SimpleBotLauncher:
             messagebox.showinfo("提示", "机器人未运行")
             return
         
+        # 添加按钮点击动画
+        self.animate_button(self.stop_btn)
+        
         try:
             self.bot_process.terminate()
             self.bot_process.wait(timeout=5)
@@ -566,14 +972,16 @@ class SimpleBotLauncher:
             self.is_running = False
             self.start_btn.config(state=tk.NORMAL)
             self.stop_btn.config(state=tk.DISABLED)
-            self.status_var.set("机器人已停止")
+            # 添加状态变化动画
+            self.animate_status_change("机器人已停止")
             
         except subprocess.TimeoutExpired:
             self.bot_process.kill()
             self.is_running = False
             self.start_btn.config(state=tk.NORMAL)
             self.stop_btn.config(state=tk.DISABLED)
-            self.status_var.set("机器人已强制停止")
+            # 添加状态变化动画
+            self.animate_status_change("机器人已强制停止")
         except Exception as e:
             messagebox.showerror("错误", f"停止失败: {e}")
     
@@ -598,6 +1006,9 @@ class SimpleBotLauncher:
     
     def save_settings(self):
         """保存连接设置"""
+        # 添加按钮点击动画
+        self.animate_button(self.save_btn)
+        
         try:
             host = self.host_entry.get().strip()
             port = int(self.port_entry.get())
@@ -618,7 +1029,8 @@ class SimpleBotLauncher:
             if self.save_config():
                 # 更新index.js文件
                 self.update_index_js()
-                messagebox.showinfo("成功", "设置保存成功")
+                # 添加成功消息动画
+                self.animate_success_message("设置保存成功")
         except ValueError:
             messagebox.showerror("错误", "端口必须是数字")
         except Exception as e:
@@ -626,6 +1038,9 @@ class SimpleBotLauncher:
     
     def save_all_config(self):
         """保存所有配置"""
+        # 添加按钮点击动画
+        self.animate_button(self.config_save_btn)
+        
         try:
             # 更新配置
             for key, entry in self.config_entries.items():
@@ -635,7 +1050,8 @@ class SimpleBotLauncher:
             
             # 保存配置
             if self.save_config():
-                messagebox.showinfo("成功", "配置保存成功")
+                # 添加成功消息动画
+                self.animate_success_message("配置保存成功")
         except ValueError:
             messagebox.showerror("错误", "请输入有效的数字")
         except Exception as e:
@@ -680,6 +1096,9 @@ class SimpleBotLauncher:
     
     def load_memory(self):
         """加载记忆"""
+        # 添加按钮点击动画
+        self.animate_button(self.refresh_btn)
+        
         if not os.path.exists(self.memory_file):
             self.memory_text.delete(1.0, tk.END)
             self.memory_text.insert(tk.END, "还没有记忆数据")
@@ -709,6 +1128,9 @@ class SimpleBotLauncher:
     
     def search_memory(self):
         """搜索记忆"""
+        # 添加按钮点击动画
+        self.animate_button(self.search_btn)
+        
         keyword = self.search_entry.get().strip().lower()
         if not keyword:
             self.load_memory()
