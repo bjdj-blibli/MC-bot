@@ -216,10 +216,7 @@ pvpBot2/
 
 ## 📞 联系方式
 
-如有问题或建议，欢迎通过以下方式联系：
-
-- 项目地址：https://github.com/bjdj-blibli/MC-bot
-- 邮箱：821651018@qq.com
+本人为5年级小学生不方便透露hhhhhhhhhhhhhhhhhhh
 ***
 
 **祝使用愉快！** 🎉
